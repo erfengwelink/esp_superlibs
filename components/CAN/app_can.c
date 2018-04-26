@@ -5,6 +5,8 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 
+#define CAN_RX //CAN_TX //
+
 #ifndef CONFIG_ESPCAN
 #error for this demo you must enable and configure ESPCan in menuconfig
 #endif
@@ -58,6 +60,55 @@ void app_can_setup()
 
 void CAN_poll_task(void *ignore)
 {
+#ifdef CAN_TX
+    printf("%s ::CAN_TX run...\r\n",__func__);
+    CAN_frame_t tx_frame;
+    tx_frame.MsgID = 1;
+    tx_frame.FIR.B.DLC = 8;
+    tx_frame.data.u8[0] = 'W';
+    tx_frame.data.u8[1] = 'E';
+    tx_frame.data.u8[2] = '_';
+    tx_frame.data.u8[3] = 'L';
+    tx_frame.data.u8[4] = 'I';
+    tx_frame.data.u8[5] = 'N';
+    tx_frame.data.u8[6] = 'K';
+    tx_frame.data.u8[7] = '.';
+
+    while(true){
+        app_can_send(&tx_frame);
+        vTaskDelay( 2000/ portTICK_PERIOD_MS);
+        if(tx_frame.MsgID > 256)
+            tx_frame.MsgID = 1;
+        tx_frame.MsgID ++;
+    }
+
+#elif defined CAN_RX
+    printf("%s ::CAN_RX run...\r\n",__func__);
+    CAN_frame_t rx_frame;
+    while(true){
+        if(pdTRUE == xQueueReceive(CAN_cfg.rx_queue, &rx_frame, 3*portTICK_PERIOD_MS))
+        {
+            if(rx_frame.FIR.B.FF == CAN_frame_std)
+                printf("New standard frame # ");
+            else 
+                printf("New extended frame # ");
+
+            if(rx_frame.FIR.B.RTR == CAN_RTR)
+                printf(" RTR from 0x%08x, DLC %d\r\n", rx_frame.MsgID, rx_frame.FIR.B.DLC);
+            else
+                printf(" from 0x%08x, DLC %d, dataL: 0x%08x, dataH: 0x%08x \r\n",
+                    rx_frame.MsgID, rx_frame.FIR.B.DLC, rx_frame.data.u32[0], rx_frame.data.u32[1]);
+                
+        }
+        
+    }
+
+#endif
+
+}
+#if 0
+void CAN_poll_task(void *ignore)
+{
     printf("%s run...\r\n",__func__);
     CAN_frame_t rx_frame;
     while(true){
@@ -84,6 +135,8 @@ void CAN_poll_task(void *ignore)
         }
     }
 }
+#endif
+
 
 //int CAN_write_frame(const CAN_frame_t* p_frame);
 
